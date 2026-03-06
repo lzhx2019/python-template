@@ -12,10 +12,11 @@
 4. [后端开发指南](#4-后端开发指南)
 5. [前端开发指南](#5-前端开发指南)
 6. [前后端联调](#6-前后端联调)
-7. [代码规范与检查](#7-代码规范与检查)
-8. [测试](#8-测试)
-9. [常见问题](#9-常见问题)
-10. [推荐学习资源](#10-推荐学习资源)
+7. [使用 Docker 开发](#7-使用-docker-开发)
+8. [代码规范与检查](#8-代码规范与检查)
+9. [测试](#9-测试)
+10. [常见问题](#10-常见问题)
+11. [延伸阅读](#11-延伸阅读)
 
 ---
 
@@ -29,8 +30,12 @@
 | **npm** | >= 9 | 随 Node.js 自带 |
 | **uv** | >= 0.4 | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
 | **Git** | >= 2.30 | 系统包管理器安装 |
+| **Docker**（可选） | >= 24.0 | [官网下载](https://www.docker.com/) |
+| **Docker Compose**（可选） | >= 2.20 | Docker Desktop 自带 |
 
 > **提示**：uv 是新一代 Python 包管理器，会自动下载并管理 Python 版本，你**无需**手动安装 Python。
+
+> Docker 为可选项。如果你更习惯容器化开发，可以跳过本地安装 Node.js 和 uv，直接参考[第 7 节：使用 Docker 开发](#7-使用-docker-开发)。
 
 验证安装：
 
@@ -140,8 +145,24 @@ npm run dev
 │   ├── .python-version            # Python 版本锁定（3.12.12）
 │   └── .env.example               # 环境变量模板
 │
+├── ops/                           # 部署与运维
+│   ├── Dockerfile.backend         # 后端镜像构建
+│   ├── Dockerfile.frontend        # 前端镜像构建（Nginx 托管）
+│   ├── docker-compose.yml         # 生产环境编排
+│   ├── docker-compose.dev.yml     # 开发环境编排（热重载）
+│   ├── nginx/
+│   │   └── nginx.conf             # Nginx 配置（SPA 回退 + API 反代）
+│   ├── scripts/                   # 运维脚本
+│   │   ├── deploy.sh              # 一键部署
+│   │   ├── stop.sh                # 停止服务
+│   │   ├── logs.sh                # 查看日志
+│   │   ├── backup.sh              # 数据备份
+│   │   └── health-check.sh        # 健康检查
+│   └── DEPLOY.md                  # 部署与运维文档
+│
 ├── README.md                      # 项目说明
-└── QUICK_START.md                 # 本文档
+├── QUICK_START.md                 # 本文档（新人开发指南）
+└── LICENSE
 ```
 
 ### 请求流转链路
@@ -405,7 +426,52 @@ npm run preview  # 预览生产构建结果
 
 ---
 
-## 7. 代码规范与检查
+## 7. 使用 Docker 开发
+
+除了本地直接运行前后端外，项目还提供了 Docker Compose 开发环境，适合不想在本机安装 Node.js / Python 的场景。
+
+### 7.1 启动开发环境
+
+```bash
+# 准备环境变量
+cp ops/.env.example ops/.env
+
+# 一键启动（后端热重载 + 前端 HMR）
+docker compose -f ops/docker-compose.dev.yml up --build
+```
+
+启动后：
+- 前端：http://localhost:5173
+- 后端：http://localhost:8000
+- API 文档：http://localhost:8000/docs
+
+### 7.2 开发模式特性
+
+- **后端**：源码目录 `backend/app/` 挂载到容器内，修改 Python 代码后 uvicorn 自动重载
+- **前端**：整个 `frontend/` 目录挂载到容器内，修改 TSX/Less 后 Vite HMR 即时生效
+- 两个服务共享同一个 Docker 网络，无需额外配置
+
+### 7.3 停止开发环境
+
+```bash
+docker compose -f ops/docker-compose.dev.yml down
+```
+
+### 7.4 生产构建预览
+
+如果想在本地预览生产环境的完整效果（Nginx 托管 + API 反代）：
+
+```bash
+docker compose -f ops/docker-compose.yml up --build
+```
+
+访问 http://localhost 即可看到与生产一致的效果。
+
+> 关于正式部署、运维操作、备份恢复等内容，请参阅 [ops/DEPLOY.md](./ops/DEPLOY.md)。
+
+---
+
+## 8. 代码规范与检查
 
 ### 后端
 
@@ -438,7 +504,7 @@ npm run lint              # 检查代码
 
 ---
 
-## 8. 测试
+## 9. 测试
 
 ### 后端测试
 
@@ -472,7 +538,7 @@ def test_register():
 
 ---
 
-## 9. 常见问题
+## 10. 常见问题
 
 ### Q: uv sync 时报 Python 版本找不到？
 
@@ -516,11 +582,32 @@ cd frontend && npm install <包名>
 cd backend && uv add <包名>
 ```
 
+### Q: Docker 开发环境启动失败？
+
+1. 确认 Docker 和 Docker Compose 已安装并正在运行
+2. 检查 `ops/.env` 文件是否已从模板复制：`cp ops/.env.example ops/.env`
+3. 查看详细日志：`docker compose -f ops/docker-compose.dev.yml logs`
+4. 端口冲突时可在 `ops/.env` 中修改 `BACKEND_PORT` 和 `FRONTEND_PORT`
+
+### Q: Docker 容器内修改代码不生效？
+
+- 开发环境（`docker-compose.dev.yml`）会挂载源码目录，修改应实时生效
+- 如果不生效，尝试重启容器：`docker compose -f ops/docker-compose.dev.yml restart`
+- 生产环境（`docker-compose.yml`）不挂载源码，修改后需重新构建：`bash ops/scripts/deploy.sh`
+
 ---
 
-## 10. 推荐学习资源
+## 11. 延伸阅读
 
-### 前端
+### 项目文档
+
+| 文档 | 说明 |
+| ---- | ---- |
+| [README.md](./README.md) | 项目概览、技术栈、API 接口速查 |
+| [QUICK_START.md](./QUICK_START.md) | 新人快速开发指南（本文档） |
+| [ops/DEPLOY.md](./ops/DEPLOY.md) | 部署与运维文档（Docker 构建、上线流程、备份恢复、故障排查） |
+
+### 前端技术栈
 
 | 资源 | 链接 |
 | ---- | ---- |
@@ -531,7 +618,7 @@ cd backend && uv add <包名>
 | React Router 文档 | https://reactrouter.com |
 | Less 文档 | https://lesscss.org |
 
-### 后端
+### 后端技术栈
 
 | 资源 | 链接 |
 | ---- | ---- |
@@ -540,6 +627,14 @@ cd backend && uv add <包名>
 | Pydantic 文档 | https://docs.pydantic.dev |
 | PyJWT 文档 | https://pyjwt.readthedocs.io |
 | uv 文档 | https://docs.astral.sh/uv |
+
+### 部署相关
+
+| 资源 | 链接 |
+| ---- | ---- |
+| Docker 文档 | https://docs.docker.com |
+| Docker Compose 文档 | https://docs.docker.com/compose |
+| Nginx 文档 | https://nginx.org/en/docs |
 
 ---
 

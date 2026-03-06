@@ -1,24 +1,21 @@
 """安全模块：密码哈希与 JWT 令牌的生成和解析。"""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
+import bcrypt
 import jwt
-from passlib.context import CryptContext
 
 from app.core.config import settings
-
-# 密码哈希上下文，使用 bcrypt 算法
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def hash_password(password: str) -> str:
     """将明文密码哈希为 bcrypt 摘要。"""
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """校验明文密码是否与哈希值匹配。"""
-    return pwd_context.verify(plain_password, hashed_password)
+    return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
 
 
 def create_access_token(subject: str, expires_delta: timedelta | None = None) -> str:
@@ -28,7 +25,7 @@ def create_access_token(subject: str, expires_delta: timedelta | None = None) ->
     :param subject: 令牌主体（通常为用户 ID）
     :param expires_delta: 自定义过期时间，默认使用配置中的值
     """
-    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
+    expire = datetime.now(UTC) + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
     payload = {"sub": subject, "exp": expire}
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 

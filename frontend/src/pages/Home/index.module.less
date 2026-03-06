@@ -1,0 +1,47 @@
+@import '@/styles/variables.less';
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: @spacing-lg;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: @spacing-md 0;
+  border-bottom: 1px solid @color-border;
+
+  h1 {
+    font-size: 24px;
+    font-weight: 600;
+  }
+}
+
+.userInfo {
+  display: flex;
+  align-items: center;
+  gap: @spacing-md;
+
+  button {
+    padding: @spacing-xs @spacing-md;
+    border: 1px solid @color-border;
+    border-radius: @border-radius;
+    background: @color-bg-white;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+      color: @color-primary;
+      border-color: @color-primary;
+    }
+  }
+}
+
+.main {
+  padding: @spacing-xl 0;
+  text-align: center;
+  color: @color-text-secondary;
+  font-size: 18px;
+}

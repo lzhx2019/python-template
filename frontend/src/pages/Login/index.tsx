@@ -1,3 +1,6 @@
+/**
+ * 登录页：输入用户名和密码，调用后端接口获取 JWT 令牌。
+ */
 import { type FormEvent, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/useAuthStore'
@@ -12,6 +15,7 @@ export default function Login() {
   const navigate = useNavigate()
   const { setToken, fetchUser } = useAuthStore()
 
+  /** 提交登录表单 */
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError('')

@@ -1,3 +1,6 @@
+/**
+ * 首页：展示欢迎信息，已登录用户显示用户名和登出按钮。
+ */
 import { useAuthStore } from '@/stores/useAuthStore'
 import styles from './index.module.less'
 

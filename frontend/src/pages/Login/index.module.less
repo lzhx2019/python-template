@@ -1,0 +1,70 @@
+@import '@/styles/variables.less';
+
+.wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: @color-bg;
+}
+
+.form {
+  width: 360px;
+  padding: @spacing-xl;
+  background: @color-bg-white;
+  border-radius: @border-radius;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+
+  h2 {
+    text-align: center;
+    margin-bottom: @spacing-lg;
+    color: @color-text;
+  }
+
+  input {
+    display: block;
+    width: 100%;
+    padding: @spacing-sm @spacing-md;
+    margin-bottom: @spacing-md;
+    border: 1px solid @color-border;
+    border-radius: @border-radius;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+
+    &:focus {
+      border-color: @color-primary;
+    }
+  }
+
+  button {
+    display: block;
+    width: 100%;
+    padding: @spacing-sm;
+    background: @color-primary;
+    color: #fff;
+    border: none;
+    border-radius: @border-radius;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background 0.2s;
+
+    &:hover {
+      background: @color-primary-hover;
+    }
+  }
+}
+
+.error {
+  color: @color-error;
+  text-align: center;
+  margin-bottom: @spacing-md;
+  font-size: 14px;
+}
+
+.link {
+  text-align: center;
+  margin-top: @spacing-md;
+  font-size: 14px;
+  color: @color-text-secondary;
+}

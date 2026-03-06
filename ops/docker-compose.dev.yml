@@ -1,0 +1,76 @@
+# ============================================================
+# 开发环境 Docker Compose
+# 挂载源码目录，支持热重载；适合本地开发调试
+# 用法：docker compose -f ops/docker-compose.dev.yml up --build
+# ============================================================
+
+services:
+  # ---------- PostgreSQL 数据库 ----------
+  db:
+    image: postgres:16-alpine
+    container_name: app-db-dev
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pg-data-dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - app-network
+
+  # ---------- 后端 API（热重载） ----------
+  backend:
+    build:
+      context: ..
+      dockerfile: ops/Dockerfile.backend
+    container_name: app-backend-dev
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@db:5432/app}
+    ports:
+      - "8000:8000"
+    volumes:
+      # 挂载源码以支持热重载
+      - ../backend/app:/app/app
+    # 覆盖启动命令：启用 --reload
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  # ---------- 前端 Vite 开发服务器 ----------
+  frontend:
+    image: node:18-alpine
+    container_name: app-frontend-dev
+    working_dir: /app
+    ports:
+      - "5173:5173"
+    volumes:
+      - ../frontend:/app
+      - frontend-node-modules:/app/node_modules
+    # 安装依赖后启动 Vite 开发服务器，绑定 0.0.0.0 以便容器外访问
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+volumes:
+  pg-data-dev:
+    driver: local
+  frontend-node-modules:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge

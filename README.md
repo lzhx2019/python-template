@@ -57,6 +57,15 @@
 │   ├── tests/                 # 测试
 │   ├── pyproject.toml         # Python 项目配置 & 依赖声明
 │   └── .python-version        # 锁定 Python 版本（3.12.12）
+├── ops/                       # 部署与运维
+│   ├── Dockerfile.backend     # 后端镜像构建
+│   ├── Dockerfile.frontend    # 前端镜像构建（Nginx）
+│   ├── docker-compose.yml     # 生产环境编排
+│   ├── docker-compose.dev.yml # 开发环境编排
+│   ├── nginx/                 # Nginx 配置
+│   ├── scripts/               # 运维脚本（部署/停止/日志/备份/健康检查）
+│   └── DEPLOY.md              # 部署与运维文档
+├── QUICK_START.md             # 新人快速开发指南
 └── README.md
 ```
 
@@ -120,6 +129,27 @@ npm run lint
 | POST | `/api/v1/auth/register` | 注册新用户      |
 | POST | `/api/v1/auth/login`    | 登录并获取 JWT  |
 | GET  | `/api/v1/auth/me`       | 获取当前用户信息 |
+
+## Docker 部署
+
+```bash
+# 准备环境变量
+cp ops/.env.example ops/.env
+# 编辑 ops/.env 修改配置
+
+# 一键构建并启动
+bash ops/scripts/deploy.sh
+```
+
+详细部署与运维说明请参阅 [ops/DEPLOY.md](./ops/DEPLOY.md)。
+
+## 文档索引
+
+| 文档 | 说明 |
+| ---- | ---- |
+| [README.md](./README.md) | 项目概览（本文档） |
+| [QUICK_START.md](./QUICK_START.md) | 新人快速开发指南 |
+| [ops/DEPLOY.md](./ops/DEPLOY.md) | 部署与运维文档 |
 
 ## 许可证
 

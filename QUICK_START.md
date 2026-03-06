@@ -59,18 +59,34 @@ cd <项目目录>
 
 ### 2.2 启动后端
 
+后端默认使用 PostgreSQL。请确保本地有可用的 PostgreSQL 实例，或使用 Docker 快速启动：
+
+```bash
+# 如本地无 PostgreSQL，可一键启动：
+docker run -d --name postgres-dev \
+    -e POSTGRES_USER=postgres \
+    -e POSTGRES_PASSWORD=postgres \
+    -e POSTGRES_DB=app \
+    -p 5432:5432 \
+    postgres:16-alpine
+```
+
+然后启动后端：
+
 ```bash
 cd backend
 
 # 安装依赖（首次运行会自动下载 Python 3.12.12 并创建虚拟环境）
 uv sync
 
-# 复制环境变量配置文件
+# 复制环境变量配置文件并按需修改
 cp .env.example .env
 
 # 启动开发服务器（支持热重载）
 uv run uvicorn app.main:app --reload
 ```
+
+> 如不想安装 PostgreSQL，可在 `.env` 中设置 `DATABASE_URL=sqlite:///./app.db` 快速开发。
 
 启动后可访问：
 - API 根地址：http://localhost:8000
@@ -275,10 +291,14 @@ api_router.include_router(article.router, prefix="/articles", tags=["articles"])
 
 | 变量名 | 说明 | 默认值 |
 | ------ | ---- | ------ |
-| `DATABASE_URL` | 数据库连接字符串 | `sqlite:///./app.db` |
+| `DATABASE_URL` | 数据库连接字符串 | `postgresql://postgres:postgres@localhost:5432/app` |
+| `DB_POOL_SIZE` | 连接池大小 | `5` |
+| `DB_MAX_OVERFLOW` | 连接池最大溢出 | `10` |
 | `SECRET_KEY` | JWT 签名密钥 | `change-me-in-production` |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | 令牌有效期（分钟） | `1440`（24 小时） |
 | `CORS_ORIGINS` | 允许跨域的前端地址 | `["http://localhost:5173"]` |
+
+> 如本地未安装 PostgreSQL，可临时使用 SQLite：`DATABASE_URL=sqlite:///./app.db`
 
 ### 4.3 常用 uv 命令
 
@@ -564,13 +584,17 @@ CORS_ORIGINS=["http://localhost:5173"]
 
 ### Q: 如何切换数据库？
 
-修改 `backend/.env` 中的 `DATABASE_URL`，例如切换到 PostgreSQL：
+项目默认使用 PostgreSQL。如需使用 SQLite 进行轻量开发，修改 `backend/.env`：
 
 ```
-DATABASE_URL=postgresql://user:password@localhost:5432/mydb
+DATABASE_URL=sqlite:///./app.db
 ```
 
-同时需要安装对应驱动：`uv add psycopg2-binary`
+如需连接其他 PostgreSQL 实例，修改连接字符串即可：
+
+```
+DATABASE_URL=postgresql://user:password@your-host:5432/mydb
+```
 
 ### Q: 如何添加新的 npm / Python 依赖？
 

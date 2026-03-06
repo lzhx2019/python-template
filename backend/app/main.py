@@ -4,10 +4,11 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlmodel import text
 
 from app.api.router import api_router
 from app.core.config import settings
-from app.core.database import create_db_and_tables
+from app.core.database import create_db_and_tables, get_session
 
 
 @asynccontextmanager
@@ -40,5 +41,16 @@ app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
 @app.get("/health")
 async def health_check():
-    """健康检查接口，用于探测服务是否正常运行。"""
-    return {"status": "ok"}
+    """健康检查接口：验证服务运行状态及数据库连通性。"""
+    db_status = "ok"
+    try:
+        session = next(get_session())
+        session.exec(text("SELECT 1"))
+        session.close()
+    except Exception:
+        db_status = "unavailable"
+
+    return {
+        "status": "ok" if db_status == "ok" else "degraded",
+        "database": db_status,
+    }

@@ -4,6 +4,28 @@
 # ============================================================
 
 services:
+  # ---------- PostgreSQL 数据库 ----------
+  db:
+    image: postgres:16-alpine
+    container_name: app-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - app-network
+
   # ---------- 后端 API 服务 ----------
   backend:
     build:
@@ -14,17 +36,18 @@ services:
     env_file:
       - .env
     environment:
-      - DATABASE_URL=${DATABASE_URL:-sqlite:///./app.db}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@db:5432/app}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
-    volumes:
-      - backend-data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 15s
     networks:
       - app-network
 
@@ -44,7 +67,7 @@ services:
       - app-network
 
 volumes:
-  backend-data:
+  pg-data:
     driver: local
 
 networks:

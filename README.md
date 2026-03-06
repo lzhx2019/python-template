@@ -19,21 +19,23 @@
 
 ### 后端（`backend/`）
 
-| 技术        | 用途             |
-| ----------- | ---------------- |
-| Python 3.12 | 运行时            |
-| FastAPI     | Web 框架          |
-| Pydantic    | 数据校验          |
-| SQLModel    | ORM（基于 SQLAlchemy）|
-| PyJWT       | JWT 身份认证       |
-| uv          | 包管理器          |
+| 技术         | 用途                     |
+| ------------ | ------------------------ |
+| Python 3.12  | 运行时                    |
+| FastAPI      | Web 框架                  |
+| Pydantic     | 数据校验                  |
+| SQLModel     | ORM（基于 SQLAlchemy）     |
+| PostgreSQL   | 关系型数据库（默认）        |
+| psycopg2     | PostgreSQL 驱动           |
+| PyJWT        | JWT 身份认证               |
+| uv           | 包管理器                  |
 
 ### 部署与运维（`ops/`）
 
 | 技术             | 用途                     |
 | ---------------- | ------------------------ |
 | Docker           | 容器化构建与运行           |
-| Docker Compose   | 多容器编排                |
+| Docker Compose   | 多容器编排（含 PostgreSQL） |
 | Nginx            | 静态资源托管 & API 反向代理 |
 
 ## 项目结构
@@ -83,6 +85,7 @@
 
 - [Node.js](https://nodejs.org/) >= 18
 - [uv](https://docs.astral.sh/uv/)（Python 包管理器）
+- [PostgreSQL](https://www.postgresql.org/) >= 14（或使用 Docker Compose 自动启动）
 
 ### 启动后端
 
@@ -92,12 +95,14 @@ cd backend
 # 安装依赖（uv 会自动创建虚拟环境）
 uv sync
 
-# 复制环境变量配置
+# 复制环境变量配置并按需修改数据库连接
 cp .env.example .env
 
 # 启动开发服务器
 uv run uvicorn app.main:app --reload
 ```
+
+> 默认连接 `postgresql://postgres:postgres@localhost:5432/app`。如本地无 PostgreSQL，可改为 `DATABASE_URL=sqlite:///./app.db` 快速开发。
 
 API 地址：**http://localhost:8000**
 交互式 API 文档：**http://localhost:8000/docs**

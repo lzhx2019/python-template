@@ -87,6 +87,7 @@ bash ops/scripts/deploy.sh
 | 前端页面 | http://localhost |
 | 后端 API | http://localhost:8000 |
 | API 文档 | http://localhost:8000/docs |
+| PostgreSQL | localhost:5432 |
 
 ---
 
@@ -135,12 +136,18 @@ docker build -f ops/Dockerfile.frontend -t app-frontend:latest .
 
 | 变量 | 说明 | 默认值 | 生产建议 |
 | ---- | ---- | ------ | -------- |
-| `DATABASE_URL` | 数据库连接字符串 | `sqlite:///./app.db` | 使用 PostgreSQL |
+| `POSTGRES_USER` | PostgreSQL 用户名 | `postgres` | 使用专用用户 |
+| `POSTGRES_PASSWORD` | PostgreSQL 密码 | `postgres` | 使用强密码 |
+| `POSTGRES_DB` | PostgreSQL 数据库名 | `app` | 按项目命名 |
+| `DATABASE_URL` | 数据库连接字符串 | `postgresql://postgres:postgres@db:5432/app` | 与上方保持一致 |
+| `DB_POOL_SIZE` | 数据库连接池大小 | `5` | 按并发量调整 |
+| `DB_MAX_OVERFLOW` | 连接池最大溢出 | `10` | 按并发量调整 |
 | `SECRET_KEY` | JWT 签名密钥 | `please-change-this...` | 随机 64 位字符串 |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | 令牌有效期（分钟） | `1440` | 按需调整 |
 | `CORS_ORIGINS` | 允许跨域的来源 | `["http://localhost"]` | 设为实际域名 |
 | `BACKEND_PORT` | 后端映射端口 | `8000` | 按需调整 |
 | `FRONTEND_PORT` | 前端映射端口 | `80` | 按需调整 |
+| `POSTGRES_PORT` | PostgreSQL 映射端口 | `5432` | 生产环境可不暴露 |
 
 ### 生成随机 SECRET_KEY
 
@@ -183,42 +190,38 @@ docker compose -f docker-compose.dev.yml up --build
 # 前端修改 TSX/Less 后自动 HMR
 ```
 
-### 6.3 使用外部数据库（PostgreSQL 示例）
+### 6.3 数据库说明
 
-修改 `ops/.env`：
+项目默认使用 **PostgreSQL 16**，已集成在 `docker-compose.yml` 和 `docker-compose.dev.yml` 中。后端通过 `psycopg2-binary` 驱动连接，并配置了连接池。
+
+Compose 启动时会自动：
+1. 拉取 `postgres:16-alpine` 镜像并启动数据库容器
+2. 后端等待数据库健康检查通过后再启动
+3. 应用启动时自动创建所有表（通过 SQLModel `create_all`）
+
+#### 使用外部 PostgreSQL
+
+如果已有独立的 PostgreSQL 实例，可移除 Compose 中的 `db` 服务，仅修改 `ops/.env`：
 
 ```
-DATABASE_URL=postgresql://user:password@db-host:5432/mydb
+DATABASE_URL=postgresql://user:password@your-db-host:5432/mydb
 ```
 
-如需在 Compose 中同时运行 PostgreSQL，可在 `docker-compose.yml` 中添加：
+#### 连接池调优
 
-```yaml
-services:
-  db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: mydb
-    ports:
-      - "5432:5432"
-    volumes:
-      - pg-data:/var/lib/postgresql/data
-    networks:
-      - app-network
+在 `ops/.env` 中调整：
 
-volumes:
-  pg-data:
+```
+DB_POOL_SIZE=10        # 连接池常驻连接数
+DB_MAX_OVERFLOW=20     # 超出 pool_size 后允许的最大临时连接数
 ```
 
-同时将 `backend` 服务的 `DATABASE_URL` 指向 `postgresql://user:password@db:5432/mydb`。
+#### 本地开发使用 SQLite
 
-后端需要安装 PostgreSQL 驱动：
+如不想安装 PostgreSQL，后端仍兼容 SQLite，修改 `backend/.env`：
 
-```bash
-cd backend && uv add psycopg2-binary
+```
+DATABASE_URL=sqlite:///./app.db
 ```
 
 ---
@@ -250,7 +253,7 @@ docker compose -f docker-compose.yml restart frontend   # 重启前端
 ### 7.4 查看容器资源占用
 
 ```bash
-docker stats app-backend app-frontend
+docker stats app-db app-backend app-frontend
 ```
 
 ### 7.5 进入容器内部调试
@@ -261,6 +264,9 @@ docker exec -it app-backend bash
 
 # 进入前端容器（Alpine 使用 sh）
 docker exec -it app-frontend sh
+
+# 进入数据库容器并连接 psql
+docker exec -it app-db psql -U postgres -d app
 ```
 
 ---
@@ -280,6 +286,7 @@ bash ops/scripts/health-check.sh
  服务健康检查
  2026-03-06 12:00:00
 ==============================
+[正常] PostgreSQL (app-db) - 接受连接
 [正常] 后端 API (http://localhost:8000/health) - HTTP 200
 [正常] 前端页面 (http://localhost:80) - HTTP 200
 ==============================
@@ -306,6 +313,8 @@ docker inspect --format='{{.State.Health.Status}}' app-frontend
 
 ## 9. 数据备份与恢复
 
+备份脚本使用 `pg_dump` 导出 PostgreSQL 数据库为 SQL 压缩文件。
+
 ### 9.1 备份
 
 ```bash
@@ -313,28 +322,34 @@ bash ops/scripts/backup.sh                    # 备份到默认目录 backups/
 bash ops/scripts/backup.sh /path/to/backup    # 备份到指定目录
 ```
 
+生成文件格式：`app-20260306_120000.sql.gz`
+
 ### 9.2 恢复
 
 ```bash
-# 停止服务
-bash ops/scripts/stop.sh
+# 解压并导入到数据库
+gunzip -c backups/app-20260306_120000.sql.gz | docker exec -i app-db psql -U postgres -d app
+```
 
-# 恢复数据卷
-docker run --rm \
-    -v ops_backend-data:/data \
-    -v /path/to/backup:/backup \
-    alpine \
-    sh -c "rm -rf /data/* && tar xzf /backup/backend-data-20260306_120000.tar.gz -C /data"
+如需恢复到干净数据库：
 
-# 重新启动
-bash ops/scripts/deploy.sh
+```bash
+# 删除并重建数据库
+docker exec app-db psql -U postgres -c "DROP DATABASE IF EXISTS app;"
+docker exec app-db psql -U postgres -c "CREATE DATABASE app;"
+
+# 导入备份
+gunzip -c backups/app-20260306_120000.sql.gz | docker exec -i app-db psql -U postgres -d app
+
+# 重启后端以重新建立连接
+cd ops && docker compose -f docker-compose.yml restart backend
 ```
 
 ### 9.3 定时备份（Cron）
 
 ```bash
 # 每天凌晨 3 点备份，保留最近 30 天
-0 3 * * * /path/to/ops/scripts/backup.sh /data/backups && find /data/backups -name "*.tar.gz" -mtime +30 -delete
+0 3 * * * /path/to/ops/scripts/backup.sh /data/backups && find /data/backups -name "*.sql.gz" -mtime +30 -delete
 ```
 
 ---
@@ -406,8 +421,9 @@ Nginx 配置中已启用 Gzip，覆盖 HTML、CSS、JS、JSON、SVG 等常见类
 ### 12.1 部署前必做
 
 - [ ] 修改 `SECRET_KEY` 为随机强密码
+- [ ] 修改 `POSTGRES_PASSWORD` 为强密码，并同步更新 `DATABASE_URL`
 - [ ] `CORS_ORIGINS` 设置为实际域名，不要使用 `*`
-- [ ] 生产环境不要暴露后端端口（仅通过 Nginx 反代访问）
+- [ ] 生产环境不要暴露后端端口和 PostgreSQL 端口（仅容器内部访问）
 - [ ] 配置 HTTPS（见下方说明）
 
 ### 12.2 配置 HTTPS
@@ -483,9 +499,11 @@ docker inspect app-backend | grep -A 10 "State"
 
 ### 问题：数据库连接失败
 
-1. 检查 `DATABASE_URL` 配置是否正确
-2. 如使用外部数据库，确认网络连通：`docker exec app-backend python -c "import urllib.request; urllib.request.urlopen('http://db-host:5432')"`
-3. 确认数据库服务已启动且允许远程连接
+1. 检查 PostgreSQL 容器是否运行：`docker ps | grep app-db`
+2. 检查数据库健康状态：`docker exec app-db pg_isready -U postgres`
+3. 确认 `DATABASE_URL` 中的主机名与 Compose 服务名一致（容器内使用 `db`）
+4. 查看 PostgreSQL 日志：`docker logs app-db`
+5. 尝试从后端容器手动连接：`docker exec app-backend python -c "import psycopg2; psycopg2.connect('postgresql://postgres:postgres@db:5432/app')"`
 
 ### 问题：磁盘空间不足
 

@@ -12,7 +12,14 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/api/v1"
 
     # --- 数据库 ---
-    DATABASE_URL: str = "sqlite:///./app.db"
+    # 支持 SQLite 和 PostgreSQL，通过 DATABASE_URL 切换：
+    #   SQLite:      sqlite:///./app.db
+    #   PostgreSQL:  postgresql://user:password@localhost:5432/dbname
+    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/app"
+
+    # PostgreSQL 连接池配置（仅对 PostgreSQL 生效）
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 10
 
     # --- JWT 认证 ---
     SECRET_KEY: str = "change-me-in-production"  # 生产环境务必修改
@@ -23,6 +30,10 @@ class Settings(BaseSettings):
     CORS_ORIGINS: list[str] = ["http://localhost:5173"]
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+
+    @property
+    def is_sqlite(self) -> bool:
+        return self.DATABASE_URL.startswith("sqlite")
 
 
 # 全局单例配置对象
